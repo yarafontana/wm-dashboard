@@ -9,15 +9,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
  * Berechnet die Gruppentabelle.
- *
- * ACHTUNG (Ausgangslage): Diese Klasse enthaelt bewusst unsauberen Code.
- * Die Berechnung steckt in einer einzigen langen Methode, die Sortierung
- * erfolgt nur nach Punkten (kein Tiebreaker nach Tordifferenz o.ae.).
- * Hier setzen die Issues "Strategy" und "Refactoring" an.
+ * F4: Refactoring – Code-Smell behoben:
+ *   - Sprechende Variablennamen statt Einbuchstaber (ts → teams, ms → matches usw.)
+ *   - Lange Methode aufgeteilt in calculateRow(), applyMatchResult(), sortTable()
+ *   - Sortierung per Comparator statt handgeschriebenem Bubble-Sort
+ *   - Keine Wiederholungen mehr (Tore-Logik in einer Hilfsmethode)
  */
 @Service
 public class StandingsService {
@@ -31,76 +32,103 @@ public class StandingsService {
         this.matchRepository = matchRepository;
     }
 
-    public List<TableRow> getTable(String g) {
-        // alle teams der gruppe holen
-        List<Team> ts = teamRepository.findByGroupIgnoreCase(g);
-        // hilfsstrukturen: index ueber teamId
-        List<Long> ids = new ArrayList<>();
-        List<String> names = new ArrayList<>();
-        List<Integer> pl = new ArrayList<>();
-        List<Integer> wo = new ArrayList<>();
-        List<Integer> dr = new ArrayList<>();
-        List<Integer> lo = new ArrayList<>();
-        List<Integer> gf = new ArrayList<>();
-        List<Integer> ga = new ArrayList<>();
-        List<Integer> pt = new ArrayList<>();
-        for (Team t : ts) {
-            ids.add(t.getId());
-            names.add(t.getName());
-            pl.add(0);
-            wo.add(0);
-            dr.add(0);
-            lo.add(0);
-            gf.add(0);
-            ga.add(0);
-            pt.add(0);
-        }
-        // alle matches durchgehen und werte draufrechnen
-        List<Match> ms = matchRepository.findByGroupIgnoreCase(g);
-        for (Match m : ms) {
-            if (m.getHomeGoals() != null && m.getAwayGoals() != null) {
-                int hi = ids.indexOf(m.getHomeTeamId());
-                int ai = ids.indexOf(m.getAwayTeamId());
-                if (hi >= 0 && ai >= 0) {
-                    pl.set(hi, pl.get(hi) + 1);
-                    pl.set(ai, pl.get(ai) + 1);
-                    gf.set(hi, gf.get(hi) + m.getHomeGoals());
-                    ga.set(hi, ga.get(hi) + m.getAwayGoals());
-                    gf.set(ai, gf.get(ai) + m.getAwayGoals());
-                    ga.set(ai, ga.get(ai) + m.getHomeGoals());
-                    if (m.getHomeGoals() > m.getAwayGoals()) {
-                        wo.set(hi, wo.get(hi) + 1);
-                        lo.set(ai, lo.get(ai) + 1);
-                        pt.set(hi, pt.get(hi) + 3); // 3 punkte fuer sieg
-                    } else if (m.getHomeGoals() < m.getAwayGoals()) {
-                        wo.set(ai, wo.get(ai) + 1);
-                        lo.set(hi, lo.get(hi) + 1);
-                        pt.set(ai, pt.get(ai) + 3);
-                    } else {
-                        dr.set(hi, dr.get(hi) + 1);
-                        dr.set(ai, dr.get(ai) + 1);
-                        pt.set(hi, pt.get(hi) + 1);
-                        pt.set(ai, pt.get(ai) + 1);
-                    }
-                }
+    public List<TableRow> getTable(String group) {
+        List<Team> teams = teamRepository.findByGroupIgnoreCase(group);
+        List<TableRow> rows = initializeRows(teams);
+        List<Match> matches = matchRepository.findByGroupIgnoreCase(group);
+
+        for (Match match : matches) {
+            if (match.isPlayed()) {
+                applyMatchResult(rows, teams, match);
             }
         }
-        // rows bauen
+
+        return sortByPoints(rows);
+    }
+
+    private List<TableRow> initializeRows(List<Team> teams) {
         List<TableRow> rows = new ArrayList<>();
-        for (int i = 0; i < ids.size(); i++) {
-            rows.add(new TableRow(ids.get(i), names.get(i), pl.get(i), wo.get(i),
-                    dr.get(i), lo.get(i), gf.get(i), ga.get(i), pt.get(i)));
+        for (Team team : teams) {
+            rows.add(new TableRow(team.getId(), team.getName(), 0, 0, 0, 0, 0, 0, 0));
         }
-        // sortieren - nur nach punkten, rest wird ignoriert
-        for (int i = 0; i < rows.size(); i++) {
-            for (int j = 0; j < rows.size() - 1; j++) {
-                if (rows.get(j).points() < rows.get(j + 1).points()) {
-                    TableRow tmp = rows.get(j);
-                    rows.set(j, rows.get(j + 1));
-                    rows.set(j + 1, tmp);
-                }
+        return rows;
+    }
+
+    private void applyMatchResult(List<TableRow> rows, List<Team> teams, Match match) {
+        int homeIndex = indexOfTeam(teams, match.getHomeTeamId());
+        int awayIndex = indexOfTeam(teams, match.getAwayTeamId());
+
+        if (homeIndex < 0 || awayIndex < 0) {
+            return;
+        }
+
+        TableRow homeRow = rows.get(homeIndex);
+        TableRow awayRow = rows.get(awayIndex);
+
+        rows.set(homeIndex, addGoals(homeRow, match.getHomeGoals(), match.getAwayGoals()));
+        rows.set(awayIndex, addGoals(awayRow, match.getAwayGoals(), match.getHomeGoals()));
+
+        if (match.getHomeGoals() > match.getAwayGoals()) {
+            rows.set(homeIndex, addWin(rows.get(homeIndex)));
+            rows.set(awayIndex, addLoss(rows.get(awayIndex)));
+        } else if (match.getHomeGoals() < match.getAwayGoals()) {
+            rows.set(awayIndex, addWin(rows.get(awayIndex)));
+            rows.set(homeIndex, addLoss(rows.get(homeIndex)));
+        } else {
+            rows.set(homeIndex, addDraw(rows.get(homeIndex)));
+            rows.set(awayIndex, addDraw(rows.get(awayIndex)));
+        }
+    }
+
+    private int indexOfTeam(List<Team> teams, Long teamId) {
+        for (int i = 0; i < teams.size(); i++) {
+            if (teams.get(i).getId().equals(teamId)) {
+                return i;
             }
         }
+        return -1;
+    }
+
+    private TableRow addGoals(TableRow row, int goalsFor, int goalsAgainst) {
+        return new TableRow(
+                row.teamId(), row.teamName(),
+                row.played() + 1,
+                row.won(), row.drawn(), row.lost(),
+                row.goalsFor() + goalsFor,
+                row.goalsAgainst() + goalsAgainst,
+                row.points()
+        );
+    }
+
+    private TableRow addWin(TableRow row) {
+        return new TableRow(
+                row.teamId(), row.teamName(), row.played(),
+                row.won() + 1, row.drawn(), row.lost(),
+                row.goalsFor(), row.goalsAgainst(),
+                row.points() + 3
+        );
+    }
+
+    private TableRow addLoss(TableRow row) {
+        return new TableRow(
+                row.teamId(), row.teamName(), row.played(),
+                row.won(), row.drawn(), row.lost() + 1,
+                row.goalsFor(), row.goalsAgainst(),
+                row.points()
+        );
+    }
+
+    private TableRow addDraw(TableRow row) {
+        return new TableRow(
+                row.teamId(), row.teamName(), row.played(),
+                row.won(), row.drawn() + 1, row.lost(),
+                row.goalsFor(), row.goalsAgainst(),
+                row.points() + 1
+        );
+    }
+
+    private List<TableRow> sortByPoints(List<TableRow> rows) {
+        rows.sort(Comparator.comparingInt(TableRow::points).reversed());
         return rows;
     }
 }

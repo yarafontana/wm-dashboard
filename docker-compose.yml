@@ -1,0 +1,37 @@
+services:
+
+  backend:
+    build:
+      context: ./wm-backend
+      dockerfile: Dockerfile
+    container_name: wm-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=default
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/teams"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wm-network
+
+  frontend:
+    build:
+      context: ./wm-frontend
+      dockerfile: Dockerfile
+    container_name: wm-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8080
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - wm-network
+
+networks:
+  wm-network:
+    driver: bridge
