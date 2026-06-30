@@ -40,4 +40,9 @@ public class KnockoutMatchView implements MatchView {
 
         return summary;
     }
+
+    @Override
+    public Match getMatch() {
+        return match;
+    }
 }

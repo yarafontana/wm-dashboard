@@ -27,4 +27,9 @@ public class GroupMatchView implements MatchView {
         }
         return match.getHomeGoals() + ":" + match.getAwayGoals();
     }
+
+    @Override
+    public Match getMatch() {
+        return match;
+    }
 }

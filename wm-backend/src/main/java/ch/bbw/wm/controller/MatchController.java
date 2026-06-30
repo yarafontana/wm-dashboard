@@ -1,5 +1,8 @@
 package ch.bbw.wm.controller;
 
+import ch.bbw.wm.decorator.MatchDecorator;
+import ch.bbw.wm.decorator.StatsDecorator;
+import ch.bbw.wm.decorator.TopMatchDecorator;
 import ch.bbw.wm.dto.ResultRequest;
 import ch.bbw.wm.entity.Match;
 import ch.bbw.wm.factory.MatchView;
@@ -34,13 +37,31 @@ public class MatchController {
     }
 
     @GetMapping("/{id}/view")
-    public ResponseEntity<MatchView> getMatchView(@PathVariable Long id) {
+    public ResponseEntity<MatchView> getMatchView(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "false") boolean stats,
+            @RequestParam(defaultValue = "false") boolean top
+    ) {
         return matchService.getAllMatches().stream()
                 .filter(m -> m.getId().equals(id))
                 .findFirst()
                 .map(matchViewFactory::createView)
+                .map(view -> applyDecorators(view, stats, top))
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private MatchView applyDecorators(MatchView baseView, boolean stats, boolean top) {
+        MatchView decorated = baseView;
+
+        if (stats) {
+            decorated = new StatsDecorator(decorated);
+        }
+        if (top) {
+            decorated = new TopMatchDecorator(decorated);
+        }
+
+        return decorated;
     }
 
     @PutMapping("/{id}/result")

@@ -174,3 +174,119 @@ Aktuell ist die Strategy-Wahl nur per Query-Parameter testbar (curl/Browser-URL)
 Ein Dropdown im Frontend (`standings/page.tsx`) wäre ein optionaler nächster
 Schritt, ist aber nicht Teil der Pflicht-Issues F1/F3 selbst – die Bewertung
 verlangt nur, dass das Pattern im Backend korrekt und laufzeit-umschaltbar ist.
+
+
+# Sprint 3
+
+## Dateien & wo sie hingehören
+
+### F2 – Decorator-Pattern (neu)
+
+| Datei | Ziel-Pfad |
+|---|---|
+| `decorator/MatchDecorator.java` | `src/main/java/ch/bbw/wm/decorator/MatchDecorator.java` (neuer Ordner) |
+| `decorator/StatsDecorator.java` | `src/main/java/ch/bbw/wm/decorator/StatsDecorator.java` |
+| `decorator/TopMatchDecorator.java` | `src/main/java/ch/bbw/wm/decorator/TopMatchDecorator.java` |
+
+### Bestehende Dateien ersetzen (wegen getMatch() Erweiterung)
+
+| Datei | Ziel-Pfad |
+|---|---|
+| `factory/MatchView.java` | **ersetzt** die Version aus Sprint 2 |
+| `factory/GroupMatchView.java` | **ersetzt** die Version aus Sprint 2 |
+| `factory/KnockoutMatchView.java` | **ersetzt** die Version aus Sprint 2 |
+| `MatchController.java` | **ersetzt** die Version aus Sprint 2 |
+
+---
+
+## Warum mussten F3-Dateien angepasst werden?
+
+F2 (Decorator) braucht Zugriff auf die rohen Match-Daten (Tore), um z.B.
+die Tordifferenz für die Statistik zu berechnen. Dafür wurde dem
+`MatchView`-Interface aus F3 eine Methode `getMatch()` hinzugefügt
+(mit `@JsonIgnore`, damit sie nicht im JSON-Response auftaucht).
+
+Das zeigt gut, wie Strategy/Factory/Decorator in echten Projekten
+zusammenspielen: F2 baut direkt auf der Struktur von F3 auf, statt
+eine komplett neue Pipeline zu bauen.
+
+---
+
+## Testen
+
+```bash
+cd wm-backend
+./mvnw spring-boot:run
+```
+
+```bash
+# Nur Roh-Ansicht (wie in Sprint 2)
+curl http://localhost:8080/api/matches/101/view
+
+# + Statistik-Schicht
+curl "http://localhost:8080/api/matches/101/view?stats=true"
+
+# + Top-Spiel/Überraschungs-Schicht
+curl "http://localhost:8080/api/matches/151/view?top=true"
+
+# Beide Schichten gestapelt -- unabhängig kombinierbar
+curl "http://localhost:8080/api/matches/151/view?stats=true&top=true"
+```
+
+Match 151 (Niederlande 2:2 Japan, Spieltag 1) eignet sich gut zum Testen
+der Top-Match-Erkennung, da insgesamt 4 Tore fielen. Für eine echte
+"Überraschung" (Tordifferenz >= 4) eignet sich z.B. Match 141
+(Deutschland 4:0 Curacao).
+
+---
+
+## Was ihr erklären können müsst (Release-Präsentation)
+
+- Warum `MatchDecorator` selbst `MatchView` implementiert (das ist der Kern
+  des Patterns: ein Decorator ist von aussen nicht von einem normalen
+  MatchView zu unterscheiden, deshalb lässt er sich beliebig stapeln)
+- Warum die Reihenfolge `stats=true&top=true` vs. `top=true&stats=true`
+  hier keinen Unterschied macht (beide Decorator hängen nur an die
+  bestehende Summary an, statt sie zu ersetzen)
+- Wie man einen dritten Decorator hinzufügen würde (z.B. ein
+  "RivalryDecorator" für klassische Duelle) -- nur eine neue Klasse,
+  `MatchController` muss nur minimal erweitert werden
+
+---
+
+## C3 – Docker Hub Re-Push (v2.0)
+
+Da sich Backend-Code geändert hat (neue Decorator/Factory-Klassen),
+müsst ihr ein neues Image mit neuem Tag pushen:
+
+```bash
+docker login
+
+docker build -t yarabbw/wm-backend:v2.0 ./wm-backend
+docker build -t yarabbw/wm-frontend:v2.0 ./wm-frontend
+
+docker push yarabbw/wm-backend:v2.0
+docker push yarabbw/wm-frontend:v2.0
+```
+
+**Wichtig für die Doku:** Beide Versionen (v1.0 und v2.0) bleiben auf
+Docker Hub sichtbar -- das zeigt der Lehrperson eine nachvollziehbare
+Versionierung über die Sprints hinweg (Pflichtkriterium bei C3).
+Trag in der Dokumentation unter "Docker Hub Links" beide Tags ein:
+
+```
+Frontend v1.0: https://hub.docker.com/r/yarabbw/wm-frontend (Tag: v1.0)
+Frontend v2.0: https://hub.docker.com/r/yarabbw/wm-frontend (Tag: v2.0)
+Backend  v1.0: https://hub.docker.com/r/yarabbw/wm-backend (Tag: v1.0)
+Backend  v2.0: https://hub.docker.com/r/yarabbw/wm-backend (Tag: v2.0)
+```
+
+---
+
+## Bekannte Einschränkung (Transparenzvermerk Doku)
+
+Die Top-Match/Überraschungs-Schwellenwerte (5 Tore, Tordifferenz 4)
+sind bewusst einfache, fest codierte Heuristiken für den Lernzweck --
+kein echtes Statistik-Modell. Das gehört, wie schon die simulierten
+Fair-Play-Werte aus Sprint 2, in den Transparenzvermerk der Doku
+als eigene technische Design-Entscheidung des Teams.
