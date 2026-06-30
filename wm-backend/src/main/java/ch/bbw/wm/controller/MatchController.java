@@ -2,6 +2,8 @@ package ch.bbw.wm.controller;
 
 import ch.bbw.wm.dto.ResultRequest;
 import ch.bbw.wm.entity.Match;
+import ch.bbw.wm.factory.MatchView;
+import ch.bbw.wm.factory.MatchViewFactory;
 import ch.bbw.wm.service.MatchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -15,10 +17,12 @@ import java.util.Optional;
 public class MatchController {
 
     private final MatchService matchService;
+    private final MatchViewFactory matchViewFactory;
 
     @Autowired
-    public MatchController(MatchService matchService) {
+    public MatchController(MatchService matchService, MatchViewFactory matchViewFactory) {
         this.matchService = matchService;
+        this.matchViewFactory = matchViewFactory;
     }
 
     @GetMapping
@@ -29,8 +33,16 @@ public class MatchController {
         return matchService.getAllMatches();
     }
 
-    // Ergebnis erfassen / aktualisieren.
-    // Hinweis: Die Eingaben werden NICHT validiert (siehe MatchService).
+    @GetMapping("/{id}/view")
+    public ResponseEntity<MatchView> getMatchView(@PathVariable Long id) {
+        return matchService.getAllMatches().stream()
+                .filter(m -> m.getId().equals(id))
+                .findFirst()
+                .map(matchViewFactory::createView)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @PutMapping("/{id}/result")
     public ResponseEntity<Match> updateResult(@PathVariable Long id,
                                               @RequestBody ResultRequest request) {

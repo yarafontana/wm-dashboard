@@ -5,9 +5,10 @@ const GROUPS = ["A", "B", "C", "D"];
 async function GroupTable({ group }: { group: string }) {
   let rows: TableRow[] = [];
   try {
-    rows = await getStandings(group);
-  } catch {
-    return (
+      rows = await getStandings(group);
+  } catch (e) {
+      console.error("DEBUG Fehler bei getStandings:", e);
+      return (
       <div className="card">
         Tabelle f&uuml;r Gruppe {group} nicht verf&uuml;gbar.
       </div>

@@ -167,3 +167,11 @@ INSERT INTO wm_match (id, home_team_id, away_team_id, match_group, home_goals, a
 INSERT INTO wm_match (id, home_team_id, away_team_id, match_group, home_goals, away_goals) VALUES (214, 45, 47, 'L', 1, 1);
 INSERT INTO wm_match (id, home_team_id, away_team_id, match_group, home_goals, away_goals) VALUES (215, 48, 45, 'L', NULL, NULL);
 INSERT INTO wm_match (id, home_team_id, away_team_id, match_group, home_goals, away_goals) VALUES (216, 46, 47, 'L', NULL, NULL);
+
+-- ----- Achtelfinale (Beispiel): Mexiko (Sieger Gruppe A) vs. Schweiz (2. Gruppe B) -----
+INSERT INTO wm_match (id, home_team_id, away_team_id, match_group, home_goals, away_goals, match_type, extra_time, penalty_home, penalty_away)
+VALUES (301, 1, 8, 'KO-Achtelfinale', 1, 1, 'KNOCKOUT', TRUE, 4, 3);
+
+-- ----- Achtelfinale (Beispiel, noch nicht gespielt) -----
+INSERT INTO wm_match (id, home_team_id, away_team_id, match_group, home_goals, away_goals, match_type, extra_time, penalty_home, penalty_away)
+VALUES (302, 17, 9, 'KO-Achtelfinale', NULL, NULL, 'KNOCKOUT', FALSE, NULL, NULL);

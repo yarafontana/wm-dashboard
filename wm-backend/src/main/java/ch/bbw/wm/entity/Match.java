@@ -11,7 +11,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-@NoArgsConstructor   // von JPA benoetigt: parameterloser Konstruktor
+@NoArgsConstructor
 @AllArgsConstructor
 @Entity
 @Table(name = "wm_match")
@@ -30,12 +30,28 @@ public class Match {
     private String group;
 
     @Column(name = "home_goals")
-    private Integer homeGoals; // null = noch nicht gespielt
+    private Integer homeGoals;
 
     @Column(name = "away_goals")
-    private Integer awayGoals; // null = noch nicht gespielt
+    private Integer awayGoals;
+
+    @Column(name = "match_type", nullable = false)
+    private String matchType = "GROUP";
+
+    @Column(name = "extra_time")
+    private Boolean extraTime = false;
+
+    @Column(name = "penalty_home")
+    private Integer penaltyHome; // null = kein Elfmeterschiessen
+
+    @Column(name = "penalty_away")
+    private Integer penaltyAway;
 
     public boolean isPlayed() {
         return homeGoals != null && awayGoals != null;
+    }
+
+    public boolean isKnockout() {
+        return "KNOCKOUT".equalsIgnoreCase(matchType);
     }
 }

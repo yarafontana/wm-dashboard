@@ -2,7 +2,9 @@
 // Die Basis-URL kann ueber NEXT_PUBLIC_API_URL gesetzt werden.
 
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
+console.log("DEBUG API_URL =", API_URL);
 
 export interface Team {
   id: number;
